@@ -7,15 +7,15 @@ TypeScript client for the (undocumented) [MyQ](https://www.myq.com/) garage door
 ## Install
 
 ```bash
-bun add myqq
+bun add @evantahler/myqq
 # or
-npm install myqq
+npm install @evantahler/myqq
 ```
 
 ## Quickstart
 
 ```ts
-import { MyQ } from "myqq";
+import { MyQ } from "@evantahler/myqq";
 
 const myq = new MyQ({
   email: process.env.MYQ_EMAIL!,
@@ -70,7 +70,7 @@ All thrown errors extend `MyQError`:
 
 ## MCP Server
 
-`myqq` ships a stdio MCP server so AI agents can drive your garage doors.
+`@evantahler/myqq` ships a stdio MCP server so AI agents can drive your garage doors.
 
 ### Configure (Claude Desktop / Claude Code / any MCP client)
 
@@ -79,7 +79,7 @@ All thrown errors extend `MyQError`:
   "mcpServers": {
     "myqq": {
       "command": "bunx",
-      "args": ["myqq"],
+      "args": ["@evantahler/myqq"],
       "env": {
         "MYQ_EMAIL": "you@example.com",
         "MYQ_PASSWORD": "..."
