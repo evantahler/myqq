@@ -24,7 +24,7 @@ export function createServer(options: ServerOptions = {}) {
 
   const server = new McpServer({
     name: "myqq",
-    version: "0.1.0",
+    version: "0.1.1",
   });
 
   server.registerTool(

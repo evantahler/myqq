@@ -1,6 +1,6 @@
 {
   "name": "@evantahler/myqq",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript client for MyQ-enabled garage doors (Liftmaster / Chamberlain / Craftsman). Includes a stdio MCP server so AI agents can query and operate doors.",
   "module": "src/index.ts",
   "main": "src/index.ts",
