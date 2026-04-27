@@ -2,6 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import pkg from "../package.json" with { type: "json" };
 import { readOnlyAnnotations, wrapTool } from "./mcp-helpers.ts";
 import { doorsCapability, registerDoorTools } from "./mcp-tools.ts";
 import { MyQ } from "./myq.ts";
@@ -23,8 +24,8 @@ export function createServer(options: ServerOptions = {}) {
     );
 
   const server = new McpServer({
-    name: "myqq",
-    version: "0.1.1",
+    name: pkg.name,
+    version: pkg.version,
   });
 
   server.registerTool(
