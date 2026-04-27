@@ -2,7 +2,7 @@
 
 TypeScript client for the (undocumented) [MyQ](https://www.myq.com/) garage door API used by Liftmaster, Chamberlain, and Craftsman openers — plus a stdio **MCP server** so AI agents can list doors, check status, and open/close them.
 
-> ⚠️ **Reality check.** The MyQ API is undocumented and Chamberlain has been actively hostile to third-party integrations. The reference TypeScript implementation [`hjdhjd/myq`](https://github.com/hjdhjd/myq) (Apache-2.0) was last published in October 2023, the companion `homebridge-myq` was archived in April 2024, and Home Assistant removed its MyQ integration in late 2023 because of Cloudflare bot protection on the auth endpoint. This package mirrors the known-good v6 OAuth+PKCE flow as a best shot — **expect it to break at some point**, possibly on the very first login attempt if Cloudflare picks up your IP.
+> ⚠️ **Warning** The MyQ API is undocumented and Chamberlain has been actively hostile to third-party integrations. The reference TypeScript implementation [`hjdhjd/myq`](https://github.com/hjdhjd/myq) (Apache-2.0) was last published in October 2023, the companion `homebridge-myq` was archived in April 2024, and Home Assistant removed its MyQ integration in late 2023 because of Cloudflare bot protection on the auth endpoint. This package mirrors the known-good v6 OAuth+PKCE flow as a best shot — **expect it to break at some point**, possibly on the very first login attempt if Cloudflare picks up your IP.
 
 ## Install
 
