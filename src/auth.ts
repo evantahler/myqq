@@ -68,6 +68,15 @@ function detectCloudflare(html: string): boolean {
   return CLOUDFLARE_HINTS.some((h) => html.includes(h));
 }
 
+function isCloudflareResponse(res: Response, body: string): boolean {
+  if (res.headers.get("cf-mitigated")) return true;
+  if (res.headers.get("cf-ray")) {
+    const server = res.headers.get("server")?.toLowerCase() ?? "";
+    if (server.includes("cloudflare")) return true;
+  }
+  return detectCloudflare(body);
+}
+
 function decodeClientSecret(): string {
   return atob(MYQ_CLIENT_SECRET_B64);
 }
@@ -104,19 +113,12 @@ export class Auth {
     const { verifier, challenge } = await generatePkcePair();
     const jar = new CookieJar();
 
-    const authorizeUrl = this.buildAuthorizeUrl(challenge);
-    const authorizeRes = await this.fetchImpl(authorizeUrl, {
-      method: "GET",
-      redirect: "manual",
-      headers: {
-        "User-Agent": MYQ_LOGIN_UA,
-        Accept: "text/html",
-      },
-    });
-    jar.ingest(getSetCookieHeaders(authorizeRes));
-    const authorizeHtml = await authorizeRes.text();
+    const { html, finalUrl, status } = await this.fetchLoginPage(
+      this.buildAuthorizeUrl(challenge),
+      jar,
+    );
 
-    if (detectCloudflare(authorizeHtml)) {
+    if (detectCloudflare(html)) {
       throw new MyQAuthError(
         "MyQ login blocked by Cloudflare. See README troubleshooting.",
         {
@@ -124,30 +126,37 @@ export class Auth {
           retryable: true,
           recovery:
             "Try a residential IP and reduce login frequency; reuse a long-lived MyQ instance",
-          status: authorizeRes.status,
+          status,
         },
       );
     }
 
-    const verificationToken = extractVerificationToken(authorizeHtml);
-    if (!verificationToken) {
+    const hiddenInputs = extractHiddenInputs(html);
+    if (!hiddenInputs.__RequestVerificationToken) {
       throw new MyQAuthError(
         "Could not find __RequestVerificationToken on login page",
         {
           recovery:
             "MyQ likely changed the login page HTML; this library may need updating",
-          status: authorizeRes.status,
+          status,
         },
       );
     }
 
-    const loginAction = extractLoginAction(authorizeHtml) ?? "/Account/Login";
-    const loginUrl = new URL(loginAction, MYQ_AUTH_BASE).toString();
+    const loginAction = extractLoginAction(html);
+    if (!loginAction) {
+      throw new MyQAuthError("Could not find login form action on login page", {
+        recovery:
+          "MyQ likely changed the login page HTML; this library may need updating",
+        status,
+      });
+    }
+    const loginUrl = new URL(loginAction, finalUrl).toString();
 
     const formBody = new URLSearchParams({
+      ...hiddenInputs,
       Email: this.email,
       Password: this.password,
-      __RequestVerificationToken: verificationToken,
     });
 
     const loginRes = await this.fetchImpl(loginUrl, {
@@ -158,6 +167,8 @@ export class Auth {
         Cookie: jar.header(),
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "text/html",
+        Referer: finalUrl,
+        Origin: new URL(finalUrl).origin,
       },
       body: formBody.toString(),
     });
@@ -165,6 +176,59 @@ export class Auth {
 
     const code = await this.followToAuthCode(loginRes, jar);
     return await this.exchangeCode(code, verifier);
+  }
+
+  private async fetchLoginPage(
+    startUrl: string,
+    jar: CookieJar,
+  ): Promise<{ html: string; finalUrl: string; status: number }> {
+    let url = startUrl;
+    for (let hop = 0; hop < 5; hop++) {
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        redirect: "manual",
+        headers: {
+          "User-Agent": MYQ_LOGIN_UA,
+          Cookie: jar.header(),
+          Accept: "text/html",
+        },
+      });
+      jar.ingest(getSetCookieHeaders(res));
+
+      const location = res.headers.get("Location");
+      if (res.status >= 300 && res.status < 400 && location) {
+        url = new URL(location, url).toString();
+        continue;
+      }
+
+      const html = await res.text();
+
+      if (res.status >= 400) {
+        if (isCloudflareResponse(res, html)) {
+          throw new MyQAuthError(
+            "MyQ login blocked by Cloudflare. See README troubleshooting.",
+            {
+              category: "cloudflare",
+              retryable: true,
+              recovery:
+                "Wait 10-30 minutes, try from a residential IP, reduce login frequency, and reuse a long-lived MyQ instance across calls.",
+              status: res.status,
+            },
+          );
+        }
+        const excerpt = html.length > 300 ? `${html.slice(0, 300)}…` : html;
+        throw new MyQAuthError(
+          `MyQ login page returned ${res.status}: ${excerpt || "(empty body)"}`,
+          {
+            retryable: res.status >= 500,
+            status: res.status,
+          },
+        );
+      }
+
+      return { html, finalUrl: url, status: res.status };
+    }
+    throw new MyQAuthError("Too many redirects fetching MyQ login page");
   }
 
   async refresh(): Promise<AuthTokens> {
@@ -193,7 +257,8 @@ export class Auth {
           body: body.toString(),
         });
         if (!res.ok) {
-          throw new MyQAuthError("Token refresh failed", {
+          const detail = await readErrorDetail(res);
+          throw new MyQAuthError(`Token refresh failed: ${detail}`, {
             status: res.status,
             retryable: res.status >= 500,
           });
@@ -306,7 +371,8 @@ export class Auth {
       body: body.toString(),
     });
     if (!res.ok) {
-      throw new MyQAuthError("Token exchange failed", {
+      const detail = await readErrorDetail(res);
+      throw new MyQAuthError(`Token exchange failed: ${detail}`, {
         status: res.status,
         retryable: res.status >= 500,
       });
@@ -341,6 +407,16 @@ export class Auth {
   }
 }
 
+async function readErrorDetail(res: Response): Promise<string> {
+  try {
+    const text = await res.text();
+    if (!text) return `HTTP ${res.status}`;
+    return text.length > 500 ? `${text.slice(0, 500)}…` : text;
+  } catch {
+    return `HTTP ${res.status}`;
+  }
+}
+
 function getSetCookieHeaders(res: Response): string[] {
   const anyHeaders = res.headers as Headers & {
     getSetCookie?: () => string[];
@@ -354,11 +430,44 @@ function getSetCookieHeaders(res: Response): string[] {
 
 export function extractVerificationToken(html: string): string | undefined {
   const match = VERIFICATION_TOKEN_RE.exec(html);
-  return match?.[1];
+  return match?.[1] ? decodeHtmlEntities(match[1]) : undefined;
 }
 
 const FORM_ACTION_RE = /<form[^>]*action=["']([^"']+)["']/i;
 export function extractLoginAction(html: string): string | undefined {
   const match = FORM_ACTION_RE.exec(html);
-  return match?.[1];
+  return match?.[1] ? decodeHtmlEntities(match[1]) : undefined;
+}
+
+const HIDDEN_INPUT_RE = /<input\b[^>]*\btype=["']hidden["'][^>]*>/gi;
+const ATTR_NAME_RE = /\bname=["']([^"']+)["']/i;
+const ATTR_VALUE_RE = /\bvalue=["']([^"']*)["']/i;
+
+export function extractHiddenInputs(html: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const match of html.matchAll(HIDDEN_INPUT_RE)) {
+    const tag = match[0];
+    const nameMatch = ATTR_NAME_RE.exec(tag);
+    const valueMatch = ATTR_VALUE_RE.exec(tag);
+    if (!nameMatch?.[1]) continue;
+    result[decodeHtmlEntities(nameMatch[1])] = valueMatch?.[1]
+      ? decodeHtmlEntities(valueMatch[1])
+      : "";
+  }
+  return result;
+}
+
+const HTML_ENTITY_MAP: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  "#39": "'",
+};
+
+function decodeHtmlEntities(s: string): string {
+  return s.replace(/&(#?\w+);/g, (raw, name: string) =>
+    name in HTML_ENTITY_MAP ? (HTML_ENTITY_MAP[name] ?? raw) : raw,
+  );
 }

@@ -29,7 +29,7 @@ describe("Api.request", () => {
         if (i === 1) {
           return {
             status: 302,
-            headers: { Location: "com.myqops://android?code=C" },
+            headers: { Location: "com.myqops://ios?code=C" },
           };
         }
         if (i === 2) {
@@ -86,7 +86,7 @@ describe("Api.request", () => {
         if (i === 1) {
           return {
             status: 302,
-            headers: { Location: "com.myqops://android?code=C" },
+            headers: { Location: "com.myqops://ios?code=C" },
           };
         }
         if (i === 2) {
@@ -132,7 +132,7 @@ describe("Api.request", () => {
         if (i === 1) {
           return {
             status: 302,
-            headers: { Location: "com.myqops://android?code=C" },
+            headers: { Location: "com.myqops://ios?code=C" },
           };
         }
         if (i === 2) {

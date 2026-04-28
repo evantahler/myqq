@@ -4,9 +4,9 @@ export const MYQ_DEVICES_BASE = "https://devices.myq-cloud.com/api/v5.2";
 export const MYQ_GDO_BASE =
   "https://account-devices-gdo.myq-cloud.com/api/v5.2";
 
-export const MYQ_CLIENT_ID = "ANDROID_CGI_MYQ";
+export const MYQ_CLIENT_ID = "IOS_CGI_MYQ";
 export const MYQ_CLIENT_SECRET_B64 = "VUQ0RFhuS3lQV3EyNUJTdw==";
-export const MYQ_REDIRECT_URI = "com.myqops://android";
+export const MYQ_REDIRECT_URI = "com.myqops://ios";
 export const MYQ_SCOPE = "MyQ_Residential offline_access";
 export const MYQ_APP_ID =
   "D9D7B25035D549D8A3EA16A9FFB8C927D4A19B55B8944011B2670A8321BF8312";

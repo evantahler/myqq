@@ -16,7 +16,7 @@ myqq — TypeScript client for the (undocumented) MyQ garage door API used by Li
 
 - **Runtime**: Bun, ESM, `type: module`
 - **No third-party HTTP client** — uses `fetch` with `redirect: "manual"` so we can intercept the OAuth 302 to a custom-scheme URI
-- **Auth**: OAuth 2.0 + PKCE flow against `partner-identity.myq-cloud.com`, mirroring the v6 flow from [hjdhjd/myq](https://github.com/hjdhjd/myq) (Apache-2.0). The library is dead and `homebridge-myq` was archived in April 2024 — Cloudflare bot protection may break login at any time
+- **Auth**: OAuth 2.0 + PKCE flow against `partner-identity.myq-cloud.com`. Originally derived from [hjdhjd/myq](https://github.com/hjdhjd/myq) (Apache-2.0, now dead — `homebridge-myq` was archived April 2024). Current client identity (`IOS_CGI_MYQ`, `com.myqops://ios`) and the unified-flow login form handling track [arraylabs/pymyq](https://github.com/arraylabs/pymyq) — **consult pymyq first when auth breaks**. Cloudflare bot protection may also block login (returns 403 with `cf-ray` header; we categorize this as `"cloudflare"`)
 - **Cookie jar**: minimal in-memory header parser/builder in `auth.ts` — no `tough-cookie`
 - **Token refresh**: scheduled `expires_in - 180s` ahead via `setTimeout`; single-flight refresh on 401 in `api.ts`
 - **MCP server**: thin orchestrator in `src/mcp-server.ts`; each domain registers tools in its own `mcp-tools.ts` (only `doors` for v0.1)

@@ -80,10 +80,13 @@ function buildResponse(spec: MockResponseSpec): Response {
 
 export function authorizeHtml(token = "vtoken123"): string {
   return `<!DOCTYPE html><html><body>
-<form method="post" action="/Account/Login">
-  <input name="__RequestVerificationToken" value="${token}" />
-  <input name="Email" />
-  <input name="Password" />
+<form method="post" action="/Account/LoginWithEmail?returnUrl=%2Fconnect%2Fauthorize%2Fcallback">
+  <input type="hidden" name="ReturnUrl" value="/connect/authorize/callback?client_id=IOS_CGI_MYQ&amp;code_challenge=abc" />
+  <input type="hidden" name="Brand" value="myq" />
+  <input type="hidden" name="UnifiedFlowRequested" value="True" />
+  <input type="hidden" name="__RequestVerificationToken" value="${token}" />
+  <input type="email" name="Email" />
+  <input type="password" name="Password" />
 </form>
 </body></html>`;
 }
