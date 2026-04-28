@@ -2,7 +2,7 @@
 
 TypeScript client for the (undocumented) [MyQ](https://www.myq.com/) garage door API used by Liftmaster, Chamberlain, and Craftsman openers — plus a stdio **MCP server** so AI agents can list doors, check status, and open/close them.
 
-> ⚠️ **Warning** The MyQ API is undocumented and Chamberlain has been actively hostile to third-party integrations. The reference TypeScript implementation [`hjdhjd/myq`](https://github.com/hjdhjd/myq) (Apache-2.0) was last published in October 2023, the companion `homebridge-myq` was archived in April 2024, and Home Assistant removed its MyQ integration in late 2023 because of Cloudflare bot protection on the auth endpoint. This package mirrors the known-good v6 OAuth+PKCE flow as a best shot — **expect it to break at some point**, possibly on the very first login attempt if Cloudflare picks up your IP.
+> ⚠️ **Warning** The MyQ API is undocumented and Chamberlain has been actively hostile to third-party integrations. The reference TypeScript implementation [`hjdhjd/myq`](https://github.com/hjdhjd/myq) (Apache-2.0) was last published in October 2023, the companion `homebridge-myq` was archived in April 2024, and Home Assistant removed its MyQ integration in late 2023 because of Cloudflare bot protection on the auth endpoint. The most actively maintained reference today is the Python [`arraylabs/pymyq`](https://github.com/arraylabs/pymyq), which is what this package now tracks for OAuth client identity (the iOS `IOS_CGI_MYQ` client; the Android variant has been deactivated server-side). Even so — **expect this to break at some point**, possibly on the very first login attempt if Cloudflare picks up your IP.
 
 ## Install
 
@@ -125,7 +125,7 @@ bun run smoke          # live end-to-end against a real account
 
 ## Credits
 
-The OAuth + PKCE flow, endpoint set, and app constants are reverse-engineered from [`hjdhjd/myq`](https://github.com/hjdhjd/myq) (Apache-2.0) — this is a fresh TypeScript implementation but the protocol knowledge is theirs.
+The OAuth + PKCE flow, endpoint set, and app constants were originally reverse-engineered from [`hjdhjd/myq`](https://github.com/hjdhjd/myq) (Apache-2.0). The current `IOS_CGI_MYQ` client identity and the unified-flow form handling track [`arraylabs/pymyq`](https://github.com/arraylabs/pymyq), which has stayed alive as MyQ has changed things. This is a fresh TypeScript implementation but the protocol knowledge is theirs.
 
 ## License
 

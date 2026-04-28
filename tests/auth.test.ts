@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   Auth,
   CookieJar,
+  extractHiddenInputs,
   extractLoginAction,
   extractVerificationToken,
 } from "../src/auth.ts";
@@ -38,7 +39,19 @@ describe("auth html parsing", () => {
   });
 
   it("extracts the form action", () => {
-    expect(extractLoginAction(authorizeHtml())).toBe("/Account/Login");
+    expect(extractLoginAction(authorizeHtml())).toBe(
+      "/Account/LoginWithEmail?returnUrl=%2Fconnect%2Fauthorize%2Fcallback",
+    );
+  });
+
+  it("extracts hidden inputs and decodes HTML entities in values", () => {
+    const inputs = extractHiddenInputs(authorizeHtml("tok-7"));
+    expect(inputs.__RequestVerificationToken).toBe("tok-7");
+    expect(inputs.Brand).toBe("myq");
+    expect(inputs.UnifiedFlowRequested).toBe("True");
+    expect(inputs.ReturnUrl).toBe(
+      "/connect/authorize/callback?client_id=IOS_CGI_MYQ&code_challenge=abc",
+    );
   });
 });
 
@@ -58,14 +71,17 @@ describe("Auth.login", () => {
       }
       if (i === 1) {
         expect(req.method).toBe("POST");
-        expect(req.url).toContain("/Account/Login");
+        expect(req.url).toContain("/Account/LoginWithEmail");
         expect(req.headers.cookie).toContain("session=abc");
         expect(req.body).toContain("__RequestVerificationToken=vtok-9");
         expect(req.body).toContain("Email=user");
+        expect(req.body).toContain("Brand=myq");
+        expect(req.body).toContain("UnifiedFlowRequested=True");
+        expect(req.body).toContain("ReturnUrl=");
         return {
           status: 302,
           headers: {
-            Location: `com.myqops://android?code=${expectedCode}`,
+            Location: `com.myqops://ios?code=${expectedCode}`,
           },
         };
       }
@@ -117,6 +133,27 @@ describe("Auth.login", () => {
     });
   });
 
+  it("detects Cloudflare via response headers when body has no hints", async () => {
+    const mock = createMockFetch(() => ({
+      status: 403,
+      headers: {
+        server: "cloudflare",
+        "cf-ray": "9f31c228a8e2042c-SJC",
+      },
+      body: "error code: 1020",
+    }));
+    const auth = new Auth({
+      email: "u",
+      password: "p",
+      fetch: mock.fetch,
+    });
+    await expect(auth.login()).rejects.toMatchObject({
+      name: "MyQAuthError",
+      category: "cloudflare",
+      status: 403,
+    });
+  });
+
   it("throws on missing verification token", async () => {
     const mock = createMockFetch(() => ({
       status: 200,
@@ -128,6 +165,61 @@ describe("Auth.login", () => {
       fetch: mock.fetch,
     });
     await expect(auth.login()).rejects.toBeInstanceOf(MyQAuthError);
+  });
+
+  it("follows the 302 from /connect/authorize to the login page", async () => {
+    const mock = createMockFetch((req, i) => {
+      if (i === 0) {
+        expect(req.method).toBe("GET");
+        expect(req.url).toContain("/connect/authorize");
+        return {
+          status: 302,
+          headers: {
+            Location:
+              "/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3DIOS_CGI_MYQ",
+            "set-cookie": ["myqidstid=abc; Path=/"],
+          },
+        };
+      }
+      if (i === 1) {
+        expect(req.method).toBe("GET");
+        expect(req.url).toContain("/Account/Login");
+        expect(req.headers.cookie).toContain("myqidstid=abc");
+        return {
+          status: 200,
+          headers: { "set-cookie": ["__cf_bm=zzz"] },
+          body: authorizeHtml("vtok-redir"),
+        };
+      }
+      if (i === 2) {
+        expect(req.method).toBe("POST");
+        expect(req.url).toContain("/Account/LoginWithEmail");
+        expect(req.headers.cookie).toContain("myqidstid=abc");
+        expect(req.headers.cookie).toContain("__cf_bm=zzz");
+        expect(req.body).toContain("__RequestVerificationToken=vtok-redir");
+        return {
+          status: 302,
+          headers: { Location: "com.myqops://ios?code=CODE-99" },
+        };
+      }
+      if (i === 3) {
+        expect(req.body).toContain("code=CODE-99");
+        return {
+          status: 200,
+          body: { access_token: "A", refresh_token: "R", expires_in: 3600 },
+        };
+      }
+      throw new Error(`unexpected request #${i}`);
+    });
+
+    const auth = new Auth({
+      email: "u",
+      password: "p",
+      fetch: mock.fetch,
+    });
+    const tokens = await auth.login();
+    expect(tokens.accessToken).toBe("A");
+    auth.disconnect();
   });
 });
 
@@ -145,7 +237,7 @@ describe("Auth.refresh", () => {
       if (i === 1) {
         return {
           status: 302,
-          headers: { Location: "com.myqops://android?code=C" },
+          headers: { Location: "com.myqops://ios?code=C" },
         };
       }
       if (i === 2) {
@@ -194,7 +286,7 @@ describe("Auth.refresh", () => {
       if (i === 1) {
         return {
           status: 302,
-          headers: { Location: "com.myqops://android?code=C" },
+          headers: { Location: "com.myqops://ios?code=C" },
         };
       }
       tokenCalls++;
